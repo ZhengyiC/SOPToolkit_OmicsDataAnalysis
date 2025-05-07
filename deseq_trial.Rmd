@@ -1,0 +1,232 @@
+---
+title: "DESeq_test_scTE"
+output: html_document
+date: '2024-10-22'
+---
+# this notebook serves as a template to run DESeq and make volcano plots for differential genes
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## import 
+```{r}
+
+
+if (!require("BiocManager", quietly = TRUE))
+    install.packages("BiocManager")
+BiocManager::install(version = "3.19")
+
+BiocManager::install("DESeq2")
+
+BiocManager::install('EnhancedVolcano')
+
+
+
+
+
+
+library( DESeq2)
+library(EnhancedVolcano)
+
+```
+
+## load data
+- the count matrix should be a gene x sample matrix 
+- the col data should be a table that as the sample names as indices ( samples matching the count matrix) and experimental conditions in each column
+
+```{r}
+getwd()
+project_dir = '~/Dropbox/scTE_try/deseq_TE_files/'
+
+cts = read.csv( paste0( project_dir , 'deseq_input_cts.csv' ), header = TRUE,row.names = 1, check.names = FALSE )
+coldata =  read.csv( paste0( project_dir , 'deseq_input_coldata.csv' ), stringsAsFactors = TRUE) 
+
+cts2 = read.csv( paste0( project_dir , 'deseq_input_raw_cts.csv' ), header = TRUE,row.names = 1, check.names = FALSE )
+coldata2 =  read.csv( paste0( project_dir , 'deseq_input_raw_coldata.csv' ), stringsAsFactors = TRUE) 
+
+#
+```
+
+## run DESeq 
+```{r}
+dds <- DESeqDataSetFromMatrix(countData = cts,
+                              colData = coldata,
+                              design= ~Patient_ID + Sample_Classification)
+
+dds <- DESeq(dds)
+
+resultsNames(dds) # lists the coefficients
+res_all = results(dds)
+res1  <- results(dds, contrast = c("Sample_Classification", "AD", "NL"))
+res2  <- results(dds, contrast = c("Sample_Classification", "SER", "NL"))
+res3  <- results(dds, contrast = c("Sample_Classification", "SER", "AD"))
+# or to shrink log fold changes association with condition:
+#res <- lfcShrink(dds, coef="Sample_Classification_NL_vs_AD", type="apeglm")
+
+filtered_result_plot_path = '~/Dropbox/scTE_try/deseq_TE_files/filtered_res_plots/'
+
+```
+
+## quick visualize result
+
+check overall result
+```{r}
+head( res_all) # this is for SER VS AD
+summary( res_all)
+```
+compare if res3 and res_all are the same
+- look like to be the same just different direction
+```{r}
+head(res3)
+```
+```{r}
+head( res_all)
+```
+
+## Make vocano plot for the comparison
+
+Here's the function
+```{r}
+customize_vocano = function(plot_res, positive_color = 'salmon', negative_color = 'royalblue', ns_color = 'gray',  pval_lim = 0.05, positive_LFC_lim = 0.5, negative_LFC_lim = -0.5, contrast_name = c('group1' ,'group2'), labSize = 5, drawConnectors = TRUE  ){
+  # this function makes a vocano plot from DESeq2 result, customizing the color scheme and thresholding limits for the LFC and p-vals
+  # Args:
+  #   plot_res is the output from DESeq2 ( plot_res = result(dds))
+  #   positive_color, negative_color, ns_color are the colors used for the significant genes that are up, down or ns regulated in the comparison group 
+  #   pval_lim, positive_LFC_lim, negative_LFC_lim are numerical values for the thresholds 
+  #   positive_LFC_lim and  negative_LFC_lim are the log2 fold change thresholds 
+  #   contrast_name should be a vector of two strings for the compared variable names in the same order as DESeq output ( eg. ['SER', 'AD'])
+  # return:
+  #   the vocano plot
+  
+  #creating a color list for each data points
+  keyvals = ifelse( 
+  (plot_res$log2FoldChange < negative_LFC_lim & plot_res$pvalue < pval_lim), negative_color, 
+  ifelse( (plot_res$log2FoldChange > positive_LFC_lim & plot_res$pvalue < pval_lim), positive_color,
+          ns_color))
+  keyvals[is.na(keyvals)] = ns_color
+  names(keyvals)[keyvals == positive_color] <- paste( contrast_name[1], 'High')
+  names(keyvals)[keyvals == ns_color] <- 'NS'
+  names(keyvals)[keyvals == negative_color] <- paste( contrast_name[2], 'High')
+  
+  
+  # make the plot
+  p = EnhancedVolcano(plot_res,
+    lab = rownames(plot_res),
+    x = 'log2FoldChange',
+    y = 'pvalue',
+    title = paste( contrast_name[1], 'vs', contrast_name[2] ), 
+    
+    FCcutoff = positive_LFC_lim, 
+    pCutoff = pval_lim, 
+    pointSize = 1.5,
+    
+    colCustom = keyvals,
+    colAlpha = 0.7,
+    legendPosition = 'right',
+    legendLabSize = 10,
+    legendIconSize = 3,
+    labSize = labSize,
+    
+    drawConnectors = drawConnectors,
+    widthConnectors = 0.2,
+    max.overlaps = 15
+    )
+  
+  return(p)
+  
+}
+
+```
+
+
+draft code to make the plot function
+```{r}
+
+keyvals = ifelse( 
+  (plot_res$log2FoldChange < -0.5 & plot_res$pvalue <0.05), 'royalblue', 
+  ifelse( (res$log2FoldChange > 0.5 & plot_res$pvalue <0.05), 'salmon',
+          'gray'))
+keyvals[is.na(keyvals)] = 'gray'
+names(keyvals)[keyvals == 'salmon'] <- 'SER high'
+names(keyvals)[keyvals == 'gray'] <- 'NS'
+names(keyvals)[keyvals == 'royalblue'] <- 'AD High'
+
+
+EnhancedVolcano(res_all,
+    lab = rownames(res_all),
+    x = 'log2FoldChange',
+    y = 'pvalue',
+    title = 'SER vs AD', 
+    
+    FCcutoff = 0.5, 
+    pCutoff = 0.05, 
+    pointSize = 1,
+    
+    colCustom = keyvals,
+    colAlpha = 0.6,
+    legendPosition = 'right',
+    legendLabSize = 10,
+    legendIconSize = 3
+    )
+```
+
+## test the function
+```{r}
+p = customize_vocano( res_all,  contrast_name = c('SER', 'AD'), labSize = 8)
+
+p
+
+#ggsave( "~/Dropbox/scTE_try/Deseq_SER_AD.png", plot = p, width = 10, height =8, dpi = 300 )
+#ggsave( "~/Dropbox/scTE_try/Deseq_SER_AD_large_label.png", plot = p, width = 10, height =8, dpi = 300 )
+
+```
+
+
+
+## results
+
+AD vs NL
+```{r}
+summary(res1)
+head( res1) #AD vs NL 
+```
+
+```{r}
+
+# a no label version
+p2 = customize_vocano(res1, pval_lim = 0.05, positive_LFC_lim = 2, negative_LFC_lim = -2,   contrast_name = c( 'AD', 'NL'), positive_color = 'royalblue', negative_color = 'orange', labSize = 0, drawConnectors = FALSE )
+p2
+
+#ggsave( "~/Dropbox/scTE_try/Deseq_AD_NL.png", plot = p2, width = 10, height =8, dpi = 300 )
+ggsave( paste0( filtered_result_plot_path, "Deseq_AD_NL.png" ), plot = p2, width = 10, height =8, dpi = 300 )
+
+
+# a label version
+p2 = customize_vocano(res1, pval_lim = 0.05, positive_LFC_lim = 2, negative_LFC_lim = -2,   contrast_name = c( 'AD', 'NL'), positive_color = 'royalblue', negative_color = 'orange', labSize = 5, drawConnectors = TRUE )
+p2
+
+#ggsave( "~/Dropbox/scTE_try/Deseq_AD_NL.png", plot = p2, width = 10, height =8, dpi = 300 )
+ggsave( paste0( filtered_result_plot_path, "Deseq_AD_NL_label.png" ), plot = p2, width = 10, height =8, dpi = 300 )
+
+```
+
+
+
+## save DGE result
+```{r}
+# SER vs AD
+write.csv(as.data.frame(res3),  file="Deseq_SER_AD_results.csv")
+
+# SER vs NL
+#res2
+write.csv(as.data.frame(res2),  file="Deseq_SER_NL_results.csv")
+
+
+# AD vs NL
+#res1
+write.csv(as.data.frame(res1),  file="Deseq_AD_NL_results.csv")
+
+getwd()
+```
+
