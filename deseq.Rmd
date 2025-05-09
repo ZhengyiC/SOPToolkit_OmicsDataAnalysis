@@ -87,12 +87,19 @@ head( res_all)
 ## Make vocano plot for the comparison
 
 Here's the function
+Updated 5/9/25
 ```{r}
-customize_vocano = function(plot_res, positive_color = 'salmon', negative_color = 'royalblue', ns_color = 'gray',  pval_lim = 0.05, positive_LFC_lim = 0.5, negative_LFC_lim = -0.5, contrast_name = c('group1' ,'group2'), labSize = 5, drawConnectors = TRUE  ){
+customize_vocano = function(plot_res, 
+                            positive_color = 'salmon', negative_color = 'royalblue', ns_color = 'gray',
+                            pval_colname = 'pvalue', lfc_colname = 'log2FoldChange', 
+                            pval_lim = 0.05, positive_LFC_lim = 0.5, negative_LFC_lim = -0.5, 
+                            contrast_name = c('group1' ,'group2'), 
+                            labSize = 5, drawConnectors = TRUE  ){
   # this function makes a vocano plot from DESeq2 result, customizing the color scheme and thresholding limits for the LFC and p-vals
   # Args:
   #   plot_res is the output from DESeq2 ( plot_res = result(dds))
-  #   positive_color, negative_color, ns_color are the colors used for the significant genes that are up, down or ns regulated in the comparison group 
+  #   positive_color, negative_color, ns_color are the colors used for the significant genes that are up, down or ns regulated in the comparison group
+  #   pval_colname and lfc_colname are the column names from the dds result that would be used for the plot. Defaults are pvale and log2FolkdChange, but some times, might prefer padj as pvalues
   #   pval_lim, positive_LFC_lim, negative_LFC_lim are numerical values for the thresholds 
   #   positive_LFC_lim and  negative_LFC_lim are the log2 fold change thresholds 
   #   contrast_name should be a vector of two strings for the compared variable names in the same order as DESeq output ( eg. ['SER', 'AD'])
@@ -100,21 +107,27 @@ customize_vocano = function(plot_res, positive_color = 'salmon', negative_color 
   #   the vocano plot
   
   #creating a color list for each data points
+  print( "debug start")
   keyvals = ifelse( 
-  (plot_res$log2FoldChange < negative_LFC_lim & plot_res$pvalue < pval_lim), negative_color, 
-  ifelse( (plot_res$log2FoldChange > positive_LFC_lim & plot_res$pvalue < pval_lim), positive_color,
+  (plot_res[[lfc_colname]] < negative_LFC_lim & plot_res[[pval_colname]] < pval_lim), negative_color, 
+  ifelse( (plot_res[[lfc_colname]]> positive_LFC_lim & plot_res[[pval_colname]] < pval_lim), positive_color,
           ns_color))
+  
+  print( "got pos and neg keywords")
   keyvals[is.na(keyvals)] = ns_color
+  
+  print( "got NS keywords")
   names(keyvals)[keyvals == positive_color] <- paste( contrast_name[1], 'High')
   names(keyvals)[keyvals == ns_color] <- 'NS'
   names(keyvals)[keyvals == negative_color] <- paste( contrast_name[2], 'High')
   
+  print( "come through coloring")
   
   # make the plot
   p = EnhancedVolcano(plot_res,
     lab = rownames(plot_res),
-    x = 'log2FoldChange',
-    y = 'pvalue',
+    x = lfc_colname,
+    y = pval_colname,
     title = paste( contrast_name[1], 'vs', contrast_name[2] ), 
     
     FCcutoff = positive_LFC_lim, 
