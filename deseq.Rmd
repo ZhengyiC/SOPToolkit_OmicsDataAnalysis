@@ -4,6 +4,7 @@ output: html_document
 date: '2024-10-22'
 ---
 # this notebook serves as a template to run DESeq and make volcano plots for differential genes
+- followed tutorial from [Deseq2 manual](https://bioconductor.org/packages/release/bioc/vignettes/DESeq2/inst/doc/DESeq2.html)
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
@@ -34,6 +35,7 @@ library(EnhancedVolcano)
 ## load data
 - the count matrix should be a gene x sample matrix 
 - the col data should be a table that as the sample names as indices ( samples matching the count matrix) and experimental conditions in each column
+- should be un-normalized integer values ( raw count table)
 
 ```{r}
 getwd()
