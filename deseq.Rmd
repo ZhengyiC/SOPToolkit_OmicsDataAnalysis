@@ -60,6 +60,9 @@ dds <- DESeq(dds)
 
 resultsNames(dds) # lists the coefficients
 res_all = results(dds)
+
+# get specific results: contrast should have 3 arguments: the colname of the condition compared, and the two labels for the condition
+
 res1  <- results(dds, contrast = c("Sample_Classification", "AD", "NL"))
 res2  <- results(dds, contrast = c("Sample_Classification", "SER", "NL"))
 res3  <- results(dds, contrast = c("Sample_Classification", "SER", "AD"))
